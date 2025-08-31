@@ -1,0 +1,122 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider     = "postgresql"
+  url          = env("DATABASE_URL")
+  relationMode = "foreignKeys"
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  sessions     Session[]
+  chatSessions ChatSession[]
+  feedback     Feedback[]
+  queryLogs    QueryLog[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model ChatSession {
+  id        String        @id @default(cuid())
+  userId    String
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String        @default("New chat")
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  messages  ChatMessage[]
+  QueryLog  QueryLog[]
+  Feedback  Feedback[]
+
+  @@index([userId, updatedAt])
+}
+
+model ChatMessage {
+  id            String      @id @default(cuid())
+  sessionId     String
+  session       ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  role          String // "user" | "assistant" | "error"
+  content       String
+  legalResponse Json?
+  traceId       String?
+  idx           Int
+  createdAt     DateTime    @default(now())
+
+  @@index([sessionId, idx])
+}
+
+model Doc {
+  id           String   @id @default(cuid())
+  url          String   @unique
+  title        String
+  jurisdiction String
+  actName      String?
+  section      String?
+  lastChecked  DateTime
+  content      String
+  chunks       Chunk[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Chunk {
+  id        String   @id @default(cuid())
+  docId     String
+  doc       Doc      @relation(fields: [docId], references: [id], onDelete: Cascade)
+  idx       Int
+  text      String
+  createdAt DateTime @default(now())
+
+  @@index([docId, idx])
+}
+
+model QueryLog {
+  id        String       @id @default(cuid())
+  userId    String?
+  user      User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  sessionId String?
+  session   ChatSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  query     String
+  topic     String
+  traceId   String       @unique
+  createdAt DateTime     @default(now())
+
+  @@index([userId, createdAt])
+  @@index([sessionId, createdAt])
+}
+
+model Feedback {
+  id            String       @id @default(cuid())
+  userId        String?
+  user          User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  sessionId     String?
+  session       ChatSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  traceId       String
+  helpful       Boolean
+  reasons       String[] // aligns with UI badges
+  note          String?
+  answerSummary String?
+  createdAt     DateTime     @default(now())
+
+  @@index([traceId])
+  @@index([userId, createdAt])
+}
