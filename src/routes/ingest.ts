@@ -5,6 +5,7 @@ import * as cheerio from "cheerio";
 import pdfParseModule from "pdf-parse/lib/pdf-parse.js";
 import { embed, toVectorSqlLiteral } from "../lib/embeddings.js";
 import { Prisma } from "@prisma/client";
+import { authRequired } from "../middleware/auth.js";
 
 const pdfParse: (buf: Buffer) => Promise<{ text: string }> =
   (pdfParseModule as any).default || (pdfParseModule as any);
@@ -44,7 +45,8 @@ function* iterChunkRanges(s: string, max = CHUNK_SIZE, overlap = CHUNK_OVERLAP) 
 }
 
 /** Main ingest */
-ingestRouter.post("/", async (req, res) => {
+ingestRouter.post("/", authRequired, async (req, res) => {
+  console.info("[ingest] start", { userId: (req as any).auth?.userId, count: (req.body?.docs || []).length });
   const docs = (req.body?.docs ?? []) as { url: string; html?: string }[];
   if (!Array.isArray(docs) || docs.length === 0) return res.status(400).json({ error: "No docs" });
 
@@ -189,5 +191,6 @@ ingestRouter.post("/", async (req, res) => {
     }
   }
 
+  console.info("[ingest] done", { inserted: totalInserted, docsProcessed: perDoc.length });
   return res.json({ inserted: totalInserted, docsProcessed: perDoc.length, perDoc });
 });

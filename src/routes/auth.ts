@@ -52,13 +52,14 @@ authRouter.post("/signup", validate(signupSchema), async (req: Request, res: Res
     const accessToken = signAccessToken({ userId: user.id });
     const session = await createSession(user.id);
 
+    console.info("[auth/signup] created", { userId: user.id, email });
     return res.json({
       token: accessToken,          // short-lived JWT
       refreshToken: session.token, // long-lived opaque token
       user,
     });
   } catch (err: any) {
-    console.error("[signup] error:", err);
+    console.error("[auth/signup] error:", err?.message || err);
     return res.status(400).json({ error: err?.message ?? "Signup failed" });
   }
 });
@@ -71,21 +72,28 @@ authRouter.post("/login", validate(loginSchema), async (req: Request, res: Respo
     const { email, password } = (req as any).validated;
 
     const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) return res.status(401).json({ error: "Invalid credentials" });
+    if (!user) {
+      console.warn("[auth/login] no user", { email });
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
 
     const ok = await bcrypt.compare(password, user.passwordHash);
-    if (!ok) return res.status(401).json({ error: "Invalid credentials" });
+    if (!ok) {
+      console.warn("[auth/login] bad password", { userId: user.id });
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
 
     const accessToken = signAccessToken({ userId: user.id });
     const session = await createSession(user.id);
 
+    console.info("[auth/login] success", { userId: user.id });
     return res.json({
       token: accessToken,
       refreshToken: session.token,
       user: { id: user.id, email: user.email, name: user.name },
     });
   } catch (err: any) {
-    console.error("[login] error:", err);
+    console.error("[auth/login] error:", err?.message || err);
     return res.status(400).json({ error: err?.message ?? "Login failed" });
   }
 });
@@ -98,17 +106,25 @@ authRouter.post("/refresh", async (req: Request, res: Response) => {
   if (!refreshToken) return res.status(400).json({ error: "Missing refreshToken" });
 
   const session = await prisma.session.findUnique({ where: { token: refreshToken } });
-  if (!session) return res.status(401).json({ error: "Invalid refreshToken" });
+  if (!session) {
+    console.warn("[auth/refresh] invalid token");
+    return res.status(401).json({ error: "Invalid refreshToken" });
+  }
 
   if (session.expiresAt < new Date()) {
     await prisma.session.delete({ where: { token: refreshToken } });
+    console.warn("[auth/refresh] expired", { userId: session.userId });
     return res.status(401).json({ error: "Refresh token expired" });
   }
 
   const newSession = await rotateSession(refreshToken);
-  if (!newSession) return res.status(401).json({ error: "Invalid session" });
+  if (!newSession) {
+    console.warn("[auth/refresh] rotate failed", { userId: session.userId });
+    return res.status(401).json({ error: "Invalid session" });
+  }
 
   const accessToken = signAccessToken({ userId: session.userId });
+  console.info("[auth/refresh] success", { userId: session.userId });
   return res.json({
     token: accessToken,
     refreshToken: newSession.token,

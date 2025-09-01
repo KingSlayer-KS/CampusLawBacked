@@ -5,7 +5,10 @@ import crypto from "crypto";
 const require = createRequire(import.meta.url);
 const jwt = require("jsonwebtoken");
 
-const JWT_SECRET = process.env.JWT_SECRET || "dev_secret";
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error("JWT_SECRET env var is required");
+}
 const ACCESS_TOKEN_TTL = process.env.ACCESS_TOKEN_TTL || "15m";
 
 export type AccessJWTPayload = {
