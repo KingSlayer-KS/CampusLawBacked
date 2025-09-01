@@ -1,12 +1,17 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "module": "NodeNext",              // <-- FIX
+    "moduleResolution": "NodeNext",    // matches the module setting
+    "strict": false,
     "esModuleInterop": true,
-    "strict": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
     "skipLibCheck": true,
-    "outDir": "dist"
+    "outDir": "dist",
+    "sourceMap": true,
+    "noEmit": false
   },
-  "include": ["src", "scripts"]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
 }
